@@ -34,3 +34,15 @@ func decrypt(value string, _, _ Key) bool {
 	}
 	return bool_val
 }
+
+func key_to_string(key Key) string {
+	return fmt.Sprintf("%s,%d", key.secret, key.pointer)
+}
+
+func key_from_string(key_str string) Key {
+	pointer, err := strconv.Atoi(key_str[len(key_str)-1:])
+	if err != nil {
+		log.Fatal(err)
+	}
+	return Key{secret: key_str[:len(key_str)-2], pointer: pointer}
+}

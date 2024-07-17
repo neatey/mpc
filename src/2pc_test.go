@@ -25,22 +25,29 @@ func TestDemonstrate2pc(t *testing.T) {
 	garbler := Garbler{input: input_a}
 	evaluator := Evaluator{input: input_b}
 
-	// Step 1: Garbler creates the garbled circuit.
+	// Step 1: Garbler creates the garbled circuit: a matrix of the outputs of
+	// each gate, each encrypted with a unique pair of keys corresponding to the
+	// inputs.
 	garbled_circuit := garbler.GarbleCircuit(circuit)
 
 	fmt.Println("Garbled circuit:", garbled_circuit)
 
 	// Step 2: Garbler transfers the encryption keys for each of the two inputs
 	// to the Evaluator.
-	// EXTENSION: Implement Oblivious Transfer so that the Garbler does not learn
-	// the value of the Evaluator's input.
-	key_a, key_b := garbler.TransferKeys(evaluator.input)
+	//
+	// The Garbler knows what input_a is, and can simply provide the encryption key.
+	// However, the Garbler cannot know input_b, so we use 1-2 Oblivious Transfer to
+	// allow the Evaluator to select the encryption key corresponding to input_b.
+	key_a := garbler.GetKeyA()
+	ot_sender := garbler.GetKeyBOtSender()
+	ot_receiver := evaluator.GetKeyBOtReceiver()
+	key_b := PerformObliviousTransfer(ot_sender, ot_receiver)
 
 	fmt.Println("Transferred key A:", key_a)
 	fmt.Println("Transferred key B:", key_b)
 
-	// Step 3: Evaluator computes the result, which can then be returned to the
-	// Garbler as well.
+	// Step 3: Evaluator uses the keys to computes the result of the circuit, which
+	// can then be returned to the Garbler as well.
 	output := evaluator.Evaluate(garbled_circuit, key_a, key_b)
 
 	fmt.Println("Output:", output)

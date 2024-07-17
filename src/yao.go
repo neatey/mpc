@@ -60,22 +60,35 @@ func (g *Garbler) GarbleGate(gate Gate) GarbledGate {
 	return garbled_gate
 }
 
-func (g *Garbler) TransferKeys(input_b bool) (Key, Key) {
-	// Return the two keys that the Evaluator must use to evaluate the circuit.
-	// TODO: Implement Oblivious Transfer so that the Garbler does not learn the
-	// value of input b.
-	key_a := g.keys[0][g.input]
-	key_b := g.keys[1][input_b]
-	return key_a, key_b
+func (g *Garbler) GetKeyA() string {
+	// Return the key for input a that the Evaluator must use to evaluate the circuit.
+	key := g.keys[0][g.input]
+	return key_to_string(key)
+}
+
+func (g *Garbler) GetKeyBOtSender() OtSender {
+	// Create an Oblivious Transfer sender containing two messages: the string from of
+	// each of the keys for input b
+	key_true := g.keys[1][true]
+	key_false := g.keys[1][false]
+	return OtSender{message0: key_to_string(key_false), message1: key_to_string(key_true)}
 }
 
 type Evaluator struct {
 	input bool
 }
 
-func (e *Evaluator) Evaluate(garbled_circuit GarbledCircuit, key_a, key_b Key) bool {
+func (e *Evaluator) GetKeyBOtReceiver() OtReceiver {
+	// Create an Oblivious Transfer receiver that will select the appropriate key for
+	// input b from the Garbler.
+	return OtReceiver{choice: e.input}
+}
+
+func (e *Evaluator) Evaluate(garbled_circuit GarbledCircuit, key_a_str, key_b_str string) bool {
 	// To evaluate, look-up the encrypted output in the garbled circuit matrix that corresponds
 	// to the row/column of each key, then decrypt using the two keys
+	key_a := key_from_string(key_a_str)
+	key_b := key_from_string(key_b_str)
 	encrypted_output := garbled_circuit.garbled_gate[key_a.pointer][key_b.pointer]
 	return decrypt(encrypted_output, key_a, key_b)
 }
