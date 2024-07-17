@@ -1,3 +1,10 @@
+// Copyright (c) 2024 Nic Neate
+//
+// Dummy cryptography functions for the MPC protocol, which are used to encrypt and decrypt
+// the outputs of the circuit gates.
+//
+// Rather than using actual encryption, these functions are design to provide readable output
+// so it is easy to understand a printed version of the garbled gate.
 package mpc
 
 import (
@@ -11,13 +18,13 @@ type Key struct {
 	pointer int
 }
 
-func generate_key(input_idx int, input_val bool) Key {
-	secret := fmt.Sprintf("key-%d-%v", input_idx, input_val)
-	return Key{secret: secret, pointer: input_idx}
+func generate_key(input_idx int, input_val bool, pointer int) Key {
+	secret := fmt.Sprintf("key%d%v", input_idx, input_val)
+	return Key{secret: secret, pointer: pointer}
 }
 
 func encrypt(value bool, key_a, key_b Key) string {
-	return fmt.Sprintf("%v-encrypted-%s-%s", value, key_a.secret, key_b.secret)
+	return fmt.Sprintf("%v-encrypted-by-%s-%s", value, key_a.secret, key_b.secret)
 }
 
 func decrypt(value string, _, _ Key) bool {

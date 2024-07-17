@@ -1,6 +1,8 @@
+// Copyright (c) 2024 Nic Neate
 package mpc
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -9,9 +11,13 @@ func TestDemonstrate2pc(t *testing.T) {
 	// For now, we only support a single AND gate.
 	// EXTENSION: Define a JSON form for multi-gate circuits and read it in from
 	// an input file.
-	circuit := Circuit{}
-	input_a := true
-	input_b := false
+	circuit := Circuit{Gate{"AND"}}
+	input_a := false
+	input_b := true
+
+	fmt.Println("Evaluating circuit:", circuit)
+	fmt.Println("Input A:", input_a)
+	fmt.Println("Input B:", input_b)
 
 	// Create the two parties involved in this computation: the Garbler and the
 	// Evaluator. Give each of them their input value for the computation. They
@@ -20,7 +26,9 @@ func TestDemonstrate2pc(t *testing.T) {
 	evaluator := Evaluator{input: input_b}
 
 	// Step 1: Garbler creates the garbled circuit.
-	garbled_circuit := garbler.Garble(circuit)
+	garbled_circuit := garbler.GarbleCircuit(circuit)
+
+	fmt.Println("Garbled circuit:", garbled_circuit)
 
 	// Step 2: Garbler transfers the encryption keys for each of the two inputs
 	// to the Evaluator.
@@ -28,11 +36,16 @@ func TestDemonstrate2pc(t *testing.T) {
 	// the value of the Evaluator's input.
 	key_a, key_b := garbler.TransferKeys(evaluator.input)
 
+	fmt.Println("Transferred key A:", key_a)
+	fmt.Println("Transferred key B:", key_b)
+
 	// Step 3: Evaluator computes the result, which can then be returned to the
 	// Garbler as well.
 	output := evaluator.Evaluate(garbled_circuit, key_a, key_b)
 
-	if output != circuit.Output(input_a, input_b) {
+	fmt.Println("Output:", output)
+
+	if output != circuit.gate.Output(input_a, input_b) {
 		t.Fatalf("Circuit is expected to evalulate to %v", !output)
 	}
 }
