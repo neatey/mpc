@@ -7,6 +7,9 @@ import (
 )
 
 func TestDemonstrate2pc(t *testing.T) {
+	fmt.Println("")
+	fmt.Println("Test case: Demonstrate a trivial example of multi-party computing using Garbled Circuits and Oblivious Transfer")
+
 	// Define the circuit for the muilt-party computation we are going to run.
 	// For now, we only support a single AND gate.
 	// EXTENSION: Define a JSON form for multi-gate circuits and read it in from
@@ -39,18 +42,18 @@ func TestDemonstrate2pc(t *testing.T) {
 	// However, the Garbler cannot know input_b, so we use 1-2 Oblivious Transfer to
 	// allow the Evaluator to select the encryption key corresponding to input_b.
 	key_a := garbler.GetKeyA()
+	fmt.Println("Transferred key A:", key_a)
+
 	ot_sender := garbler.GetKeyBOtSender()
 	ot_receiver := evaluator.GetKeyBOtReceiver()
 	key_b := PerformObliviousTransfer(ot_sender, ot_receiver)
-
-	fmt.Println("Transferred key A:", key_a)
-	fmt.Println("Transferred key B:", key_b)
+	fmt.Println("Obliviously Transferred key B:", key_b)
 
 	// Step 3: Evaluator uses the keys to computes the result of the circuit, which
 	// can then be returned to the Garbler as well.
 	output := evaluator.Evaluate(garbled_circuit, key_a, key_b)
 
-	fmt.Println("Output:", output)
+	fmt.Println("Circuit output:", output)
 
 	if output != circuit.gate.Output(input_a, input_b) {
 		t.Fatalf("Circuit is expected to evalulate to %v", !output)

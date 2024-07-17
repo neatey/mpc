@@ -5,6 +5,9 @@
 package mpc
 
 import (
+	"fmt"
+	"math"
+	"math/big"
 	"math/rand"
 )
 
@@ -33,6 +36,8 @@ func PerformObliviousTransfer(sender OtSender, receiver OtReceiver) string {
 	// The sender never knows which one the receiver has chosen. The receiver can only decrypt
 	// the one they have chosen.
 	encrypted_message0, encrypted_message1 := sender.GetEncryptedMessages(v)
+	fmt.Println("-- OT Encypted message 0:", encrypted_message0)
+	fmt.Println("-- OT Encypted message 1:", encrypted_message1)
 
 	// Finally, the receiver decrypts their selected message.
 	return receiver.DecryptSelectedMessage(encrypted_message0, encrypted_message1, public_key.modulus_n)
@@ -45,16 +50,17 @@ type RsaKeyPair struct {
 }
 
 type RsaPublicKey struct {
-	modulus_n         int
-	public_exponent_e int
+	modulus_n         int64
+	public_exponent_e int64
 }
 
 type RsaPrivateKey struct {
-	private_exponent_d int
+	private_exponent_d int64
 }
 
 // Generate a new RSA key pair. Because this is a toy implementation designed
-// to illustrate the protocol, we use a trivial fixed key pair:
+// to illustrate the protocol, we use a trivial fixed key pair that allows us
+// to work with int types:
 // p = 61, q = 53
 // N = p * q = 3233
 // e = 17
@@ -72,33 +78,34 @@ func generate_rsa_key_pair() RsaKeyPair {
 	}
 }
 
-// Compute a to the power of b using Knuth binary powering algorithm
-func pow(a, b int) int {
-	power := 1
-	for b > 0 {
-		if b&1 != 0 {
-			power *= a
-		}
-		b >>= 1
-		a *= a
+func pow_mod(a, b, m int64) int64 {
+	out := big.NewInt(0)
+	return out.Exp(big.NewInt(int64(a)), big.NewInt(int64(b)), big.NewInt(int64(m))).Int64()
+}
+
+// Compute a mod b, but always return a positive number
+func mod(a float64, b int64) int64 {
+	m := int64(math.Mod(a, float64(b)))
+	if m < 0 {
+		m += b
 	}
-	return power
+	return m
 }
 
 // Encrypt a string byte by byte
-func encrypt_message(message string, k int, modulus_n int) []int {
-	var encrypted_message []int
+func encrypt_message(message string, k int64, modulus_n int64) []int64 {
+	var encrypted_message []int64
 	for _, c := range message {
-		encrypted_message = append(encrypted_message, (int(c)+k)%modulus_n)
+		encrypted_message = append(encrypted_message, mod(float64(c)+float64(k), modulus_n))
 	}
 	return encrypted_message
 }
 
 // Decrypt a string by reversing the encrypt() function above
-func decrypt_message(encrypted_message []int, k int, modulus_n int) string {
+func decrypt_message(encrypted_message []int64, k int64, modulus_n int64) string {
 	var decrypted_runes []rune
 	for _, ec := range encrypted_message {
-		decrypted_runes = append(decrypted_runes, rune((ec-k)%modulus_n))
+		decrypted_runes = append(decrypted_runes, rune(mod(float64(int64(ec)-k), modulus_n)))
 	}
 	return string(decrypted_runes)
 }
@@ -107,8 +114,8 @@ type OtSender struct {
 	message0     string
 	message1     string
 	rsa_key_pair RsaKeyPair
-	x0           int
-	x1           int
+	x0           int64
+	x1           int64
 }
 
 func (s *OtSender) GetPublicKey() RsaPublicKey {
@@ -117,19 +124,24 @@ func (s *OtSender) GetPublicKey() RsaPublicKey {
 }
 
 // Generate and return two random values.
-func (s *OtSender) GetRandomValuesX0X1() (int, int) {
-	s.x0 = rand.Int()
-	s.x1 = rand.Int()
+func (s *OtSender) GetRandomValuesX0X1() (int64, int64) {
+	s.x0 = rand.Int63n(100)
+	s.x1 = rand.Int63n(100)
 	return s.x0, s.x1
 }
 
-func (s *OtSender) compute_k0_k1(v int) (int, int) {
-	k0 := pow(v-s.x0, s.rsa_key_pair.private_key.private_exponent_d) % s.rsa_key_pair.public_key.modulus_n
-	k1 := pow(v-s.x1, s.rsa_key_pair.private_key.private_exponent_d) % s.rsa_key_pair.public_key.modulus_n
-	return k0, k1
+func (s *OtSender) compute_k0_k1(v int64) (int64, int64) {
+	// Compute k0 and k1 using the RSA private key
+	// xb + k = decrypted(v) = v^d mod N
+	// kb = (v^d - xb) mod N
+	xb_plus_kb := pow_mod(v, s.rsa_key_pair.private_key.private_exponent_d, s.rsa_key_pair.public_key.modulus_n)
+
+	k0 := mod(float64(xb_plus_kb-s.x0), s.rsa_key_pair.public_key.modulus_n)
+	k1 := mod(float64(xb_plus_kb-s.x1), s.rsa_key_pair.public_key.modulus_n)
+	return int64(k0), int64(k1)
 }
 
-func (s *OtSender) GetEncryptedMessages(v int) ([]int, []int) {
+func (s *OtSender) GetEncryptedMessages(v int64) ([]int64, []int64) {
 	k0, k1 := s.compute_k0_k1(v)
 
 	encrypted_message0 := encrypt_message(s.message0, k0, s.rsa_key_pair.public_key.modulus_n)
@@ -140,21 +152,24 @@ func (s *OtSender) GetEncryptedMessages(v int) ([]int, []int) {
 
 type OtReceiver struct {
 	choice bool
-	k      int
+	k      int64
 }
 
-func (r *OtReceiver) BlindXb(x0, x1 int, public_key RsaPublicKey) int {
+func (r *OtReceiver) BlindXb(x0, x1 int64, public_key RsaPublicKey) int64 {
+	// Choose xb and a random k
 	xb := x0
 	if r.choice {
 		xb = x1
 	}
+	r.k = rand.Int63n(100)
 
-	r.k = rand.Int()
+	// RSA encrypt xb + k using (xb + k) ^ e mod N
+	blind_xb := pow_mod(xb+r.k, public_key.public_exponent_e, public_key.modulus_n)
 
-	return (xb + pow(r.k, public_key.public_exponent_e)) % public_key.modulus_n
+	return blind_xb
 }
 
-func (r *OtReceiver) DecryptSelectedMessage(encrypted_message0, encrypted_message1 []int, modulus_n int) string {
+func (r *OtReceiver) DecryptSelectedMessage(encrypted_message0, encrypted_message1 []int64, modulus_n int64) string {
 	encrypted_message := encrypted_message0
 	if r.choice {
 		encrypted_message = encrypted_message1
